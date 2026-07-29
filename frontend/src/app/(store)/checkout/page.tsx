@@ -9,6 +9,7 @@ import { useCart } from "@/hooks/useCart";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
+/** Apple-inspired checkout shell: calm, centered, minimal chrome */
 export default function CheckoutPage() {
   const { isAuthenticated } = useAuthStore();
   const { items } = useCart();
@@ -24,12 +25,14 @@ export default function CheckoutPage() {
   if (!isAuthenticated) {
     return (
       <StoreLayout>
-        <div className="max-w-md mx-auto py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Login Required</h1>
-          <p className="text-muted-foreground mb-8">Please login to continue with checkout.</p>
-          <Link href="/login?redirect=/checkout">
-            <Button>Login</Button>
-          </Link>
+        <div className="mx-auto max-w-md px-5 py-28 text-center">
+          <h1 className="font-display text-3xl font-normal tracking-tight">Sign in to checkout</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Please sign in to complete your order.
+          </p>
+          <Button asChild className="mt-8">
+            <Link href="/login?redirect=/checkout">Sign in</Link>
+          </Button>
         </div>
       </StoreLayout>
     );
@@ -38,11 +41,11 @@ export default function CheckoutPage() {
   if (activeItems.length === 0) {
     return (
       <StoreLayout>
-        <div className="max-w-md mx-auto py-16 text-center">
-          <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
-          <Link href="/shop">
-            <Button>Shop Now</Button>
-          </Link>
+        <div className="mx-auto max-w-md px-5 py-28 text-center">
+          <h1 className="font-display text-3xl font-normal tracking-tight">Your bag is empty</h1>
+          <Button asChild className="mt-8">
+            <Link href="/shop">Continue shopping</Link>
+          </Button>
         </div>
       </StoreLayout>
     );
@@ -50,9 +53,18 @@ export default function CheckoutPage() {
 
   return (
     <StoreLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <h1 className="text-3xl font-bold mb-8">Checkout</h1>
-        <CheckoutForm />
+      <div className="apple-panel min-h-[calc(100vh-4rem)]">
+        <div className="container-page mx-auto max-w-5xl px-5 py-12 sm:px-8 lg:py-16">
+          <h1 className="text-center font-display text-3xl font-normal tracking-tight sm:text-4xl">
+            Checkout
+          </h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            Review your order and place it securely.
+          </p>
+          <div className="mt-12">
+            <CheckoutForm />
+          </div>
+        </div>
       </div>
     </StoreLayout>
   );

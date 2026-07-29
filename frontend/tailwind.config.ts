@@ -11,7 +11,7 @@ const config: Config = {
     container: {
       center: true,
       padding: "2rem",
-      screens: { "2xl": "1400px" },
+      screens: { "2xl": "1440px" },
     },
     extend: {
       colors: {
@@ -52,20 +52,26 @@ const config: Config = {
         surface: "hsl(var(--surface))",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 4px)",
-        sm: "calc(var(--radius) - 8px)",
-        "2xl": "1.25rem",
-        "3xl": "1.75rem",
+        lg: "0",
+        md: "0",
+        sm: "0",
       },
       fontFamily: {
-        sans: ["var(--font-outfit)", "var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "var(--font-playfair)", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "Didot", "Bodoni MT", "serif"],
       },
-      boxShadow: {
-        soft: "0 1px 2px rgba(24,20,15,0.04), 0 8px 24px rgba(24,20,15,0.05)",
-        lift: "0 12px 40px rgba(24,20,15,0.1)",
-        glow: "0 0 0 1px rgba(24,20,15,0.04), 0 20px 50px rgba(24,20,15,0.08)",
+      maxWidth: {
+        page: "1440px",
+      },
+      transitionTimingFunction: {
+        luxury: "cubic-bezier(0.22, 1, 0.36, 1)",
+        expo: "cubic-bezier(0.16, 1, 0.3, 1)",
+      },
+      transitionDuration: {
+        400: "400ms",
+        600: "600ms",
+        800: "800ms",
+        900: "900ms",
       },
       keyframes: {
         "accordion-down": {
@@ -81,7 +87,7 @@ const config: Config = {
           to: { opacity: "1" },
         },
         "fade-up": {
-          from: { opacity: "0", transform: "translateY(16px)" },
+          from: { opacity: "0", transform: "translateY(18px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "slide-in-right": {
@@ -92,24 +98,14 @@ const config: Config = {
           from: { transform: "translateX(0)" },
           to: { transform: "translateX(100%)" },
         },
-        marquee: {
-          from: { transform: "translateX(0)" },
-          to: { transform: "translateX(-100%)" },
-        },
-        shimmer: {
-          from: { backgroundPosition: "-200% 0" },
-          to: { backgroundPosition: "200% 0" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.5s ease-out",
-        "fade-up": "fade-up 0.6s cubic-bezier(0.22,1,0.36,1)",
-        "slide-in-right": "slide-in-right 0.3s ease-out",
-        "slide-out-right": "slide-out-right 0.3s ease-out",
-        marquee: "marquee 30s linear infinite",
-        shimmer: "shimmer 2s linear infinite",
+        "fade-in": "fade-in 0.6s ease-out",
+        "fade-up": "fade-up 0.8s cubic-bezier(0.22,1,0.36,1)",
+        "slide-in-right": "slide-in-right 0.4s cubic-bezier(0.22,1,0.36,1)",
+        "slide-out-right": "slide-out-right 0.35s ease-out",
       },
     },
   },

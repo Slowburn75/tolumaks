@@ -2,47 +2,40 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles, Star, Truck } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product/ProductCard";
 import { bannersApi, productsApi } from "@/lib/api";
 import { useSiteSettings } from "@/providers/SiteSettingsProvider";
 import type { Product } from "@/types";
 
-const bg = (image: string) => ({ backgroundImage: "url(" + image + ")" });
+const bg = (image: string) => ({ backgroundImage: `url(${image})` });
 
 type HeroSlide = {
   eyebrow: string;
   title: string;
   copy: string;
   image: string;
-  links: Array<{ label: string; href: string }>;
+  href: string;
+  cta: string;
 };
 
-const defaultHeroSlides: HeroSlide[] = [
+const defaultHero: HeroSlide[] = [
   {
-    eyebrow: "New season edit",
-    title: "Style that moves like confidence.",
-    copy: "Premium fashion, shoes, bags, and everyday essentials curated for a sharper wardrobe.",
+    eyebrow: "Spring / Summer",
+    title: "The new season",
+    copy: "Essential silhouettes. Elevated materials.",
     image:
-      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=2200&q=85",
-    links: [
-      { label: "Shop Women", href: "/shop?gender=female" },
-      { label: "Shop Men", href: "/shop?gender=male" },
-      { label: "Shop Kids", href: "/shop?ageGroup=children" },
-    ],
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=2400&q=85",
+    href: "/shop?isNewArrival=true",
+    cta: "Shop now",
   },
   {
-    eyebrow: "Quiet luxury",
-    title: "Modern essentials, elevated.",
-    copy: "Clean silhouettes and refined materials that look expensive without trying too hard.",
+    eyebrow: "Women",
+    title: "Quiet luxury",
+    copy: "Modern pieces for every day.",
     image:
-      "https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=2200&q=85",
-    links: [
-      { label: "New Arrivals", href: "/shop?isNewArrival=true" },
-      { label: "Best Sellers", href: "/shop?isBestSeller=true" },
-      { label: "Sale", href: "/shop?sale=true" },
-    ],
+      "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=2400&q=85",
+    href: "/shop?gender=female",
+    cta: "Explore women",
   },
 ];
 
@@ -59,13 +52,12 @@ function pickList<T>(res: unknown): T[] {
   return [];
 }
 
-const promiseIcons = [ShieldCheck, Truck, CheckCircle2, Sparkles];
-
+/** Zara + COS: full-bleed editorial, sparse copy, large type, restrained CTAs */
 export function PremiumHomePage() {
   const { settings } = useSiteSettings();
   const hp = settings.homepage;
   const [active, setActive] = useState(0);
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultHeroSlides);
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultHero);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
 
@@ -77,296 +69,225 @@ export function PremiumHomePage() {
             name: "Women",
             href: "/shop?gender=female",
             image:
-              "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=900&q=85",
-            copy: "Dresses, sets, bags, and elevated daily wear.",
+              "https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1200&q=85",
+            copy: "",
+          },
+          {
+            name: "Men",
+            href: "/shop?gender=male",
+            image:
+              "https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&w=1200&q=85",
+            copy: "",
+          },
+          {
+            name: "Shoes",
+            href: "/shop?category=shoes",
+            image:
+              "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=85",
+            copy: "",
+          },
+          {
+            name: "Bags",
+            href: "/shop?category=bags",
+            image:
+              "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=1200&q=85",
+            copy: "",
           },
         ];
 
   useEffect(() => {
-    const timer = window.setInterval(
-      () => setActive((value) => (value + 1) % Math.max(heroSlides.length, 1)),
-      6500
+    const t = window.setInterval(
+      () => setActive((v) => (v + 1) % Math.max(heroSlides.length, 1)),
+      7000
     );
-    return () => window.clearInterval(timer);
+    return () => window.clearInterval(t);
   }, [heroSlides.length]);
 
   useEffect(() => {
-    productsApi
-      .getNewArrivals(4)
-      .then((res) => setNewArrivals(pickList<Product>(res)))
-      .catch(() => setNewArrivals([]));
-    productsApi
-      .getBestSellers(4)
-      .then((res) => setBestSellers(pickList<Product>(res)))
-      .catch(() => setBestSellers([]));
+    productsApi.getNewArrivals(8).then((r) => setNewArrivals(pickList(r))).catch(() => {});
+    productsApi.getBestSellers(8).then((r) => setBestSellers(pickList(r))).catch(() => {});
     bannersApi
       .getActive()
       .then((res) => {
-        const list = pickList<{
-          title: string;
-          subtitle?: string;
-          image: string;
-          link?: string;
-        }>(res);
+        const list = pickList<{ title: string; subtitle?: string; image: string; link?: string }>(res);
         if (list.length) {
           setHeroSlides(
             list.map((b) => ({
               eyebrow: "Featured",
               title: b.title,
-              copy: b.subtitle || settings.storeTagline || "Discover the latest from Tolumak.",
+              copy: b.subtitle || "",
               image: b.image,
-              links: [{ label: "Shop now", href: b.link || "/shop" }],
+              href: b.link || "/shop",
+              cta: "Shop now",
             }))
           );
           setActive(0);
         }
       })
       .catch(() => {});
-  }, [settings.storeTagline]);
+  }, []);
 
-  const slide = heroSlides[active] || defaultHeroSlides[0];
-  const promises = hp.promises?.length ? hp.promises : [];
-  const featureCards = hp.featureCards || [];
-  const testimonials = hp.testimonials || [];
-  const galleryImages = hp.galleryImages || [];
+  const slide = heroSlides[active] || defaultHero[0];
   const promo = hp.promo;
 
   return (
-    <main className="overflow-hidden">
-      {/* HERO */}
-      <section className="relative min-h-[92vh] bg-[#0c0b0a] text-white">
-        {heroSlides.map((item, index) => (
+    <main>
+      {/* HERO — Zara full bleed */}
+      <section className="relative h-[100svh] min-h-[560px] max-h-[920px] bg-black text-white">
+        {heroSlides.map((item, i) => (
           <div
-            key={item.title + index}
+            key={item.title + i}
             className={
-              "absolute inset-0 transition-opacity duration-[1200ms] " +
-              (index === active ? "opacity-100" : "opacity-0")
+              "absolute inset-0 transition-opacity duration-1000 ease-luxury " +
+              (i === active ? "opacity-100" : "opacity-0")
             }
           >
             <div className="absolute inset-0 bg-cover bg-center" style={bg(item.image)} />
-            <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(12,11,10,.82)_0%,rgba(12,11,10,.45)_48%,rgba(12,11,10,.15)_100%)]" />
+            <div className="absolute inset-0 bg-black/25" />
           </div>
         ))}
 
-        <div className="container-page relative flex min-h-[92vh] flex-col justify-end px-4 pb-14 pt-32 sm:px-6 lg:px-8 lg:pb-20">
-          <div className="max-w-3xl animate-fade-up">
-            <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/60">
+        <div className="container-page relative flex h-full flex-col items-center justify-end px-5 pb-16 text-center sm:px-8 lg:pb-20">
+          <div className="fade-up max-w-3xl">
+            <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-white/75">
               {slide.eyebrow}
             </p>
-            <h1 className="max-w-3xl font-display text-5xl font-medium leading-[0.98] tracking-tight sm:text-6xl lg:text-7xl xl:text-8xl">
+            <h1 className="mt-5 font-display text-5xl font-normal leading-[1.05] tracking-[-0.02em] sm:text-6xl md:text-7xl lg:text-8xl">
               {slide.title}
             </h1>
-            <p className="mt-6 max-w-lg text-base leading-relaxed text-white/72 sm:text-lg">
-              {slide.copy}
-            </p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              {slide.links.map((link, index) => (
-                <Button
-                  key={link.href + link.label}
-                  asChild
-                  size="lg"
-                  variant={index === 0 ? "default" : "outline"}
-                  className={
-                    index === 0
-                      ? "h-12 rounded-full bg-white px-7 text-black hover:bg-white/90"
-                      : "h-12 rounded-full border-white/30 bg-white/10 px-7 text-white backdrop-blur hover:bg-white hover:text-black"
-                  }
-                >
-                  <Link href={link.href}>{link.label}</Link>
-                </Button>
-              ))}
-            </div>
+            {slide.copy && (
+              <p className="mx-auto mt-5 max-w-md text-sm font-light tracking-wide text-white/80">
+                {slide.copy}
+              </p>
+            )}
+            <Link
+              href={slide.href}
+              className="mt-8 inline-block border border-white/80 px-10 py-3.5 text-[10px] font-medium uppercase tracking-[0.28em] text-white transition-colors duration-500 hover:bg-white hover:text-black"
+            >
+              {slide.cta}
+            </Link>
           </div>
 
-          <div className="mt-12 flex items-center gap-2.5">
-            {heroSlides.map((item, index) => (
-              <button
-                key={item.title + index}
-                aria-label={"Show slide " + (index + 1)}
-                onClick={() => setActive(index)}
-                className={
-                  "h-1 rounded-full transition-all duration-300 " +
-                  (index === active ? "w-12 bg-white" : "w-6 bg-white/35 hover:bg-white/60")
-                }
-              />
-            ))}
-          </div>
+          {heroSlides.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
+              {heroSlides.map((_, i) => (
+                <button
+                  key={i}
+                  aria-label={`Slide ${i + 1}`}
+                  onClick={() => setActive(i)}
+                  className={
+                    "h-px transition-all duration-500 " +
+                    (i === active ? "w-10 bg-white" : "w-5 bg-white/40")
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* CATEGORIES */}
-      <section className="section-pad">
+      {/* CATEGORIES — COS 2×2 editorial */}
+      <section className="section-lv">
         <div className="container-page">
-          <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="eyebrow">Shop the edit</p>
-              <h2 className="mt-3 font-display text-4xl font-medium tracking-tight sm:text-5xl">
-                Editorial categories
-              </h2>
-            </div>
+          <div className="mb-12 flex items-end justify-between gap-6">
+            <h2 className="font-display text-3xl font-normal tracking-tight sm:text-4xl">
+              Shop by category
+            </h2>
             <Link
               href="/shop"
-              className="inline-flex items-center gap-2 text-sm font-medium text-foreground/70 transition-colors hover:text-foreground"
+              className="hidden text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground sm:block"
             >
               View all
-              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-6 lg:gap-5">
-            {categories.map((cat, index) => (
-              <Link
-                key={cat.name + index}
-                href={cat.href}
-                className={
-                  "group relative min-h-[340px] overflow-hidden rounded-3xl bg-muted shadow-soft " +
-                  (index < 2 ? "md:col-span-3" : "md:col-span-2")
-                }
-              >
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                  style={bg(cat.image)}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-7">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-white/60">
-                    {settings.storeName}
-                  </p>
-                  <h3 className="mt-2 font-display text-3xl font-medium">{cat.name}</h3>
-                  <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/70">{cat.copy}</p>
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4 lg:gap-5">
+            {categories.slice(0, 4).map((cat) => (
+              <Link key={cat.name} href={cat.href} className="group relative block">
+                <div className="relative aspect-[3/4] overflow-hidden bg-[#f0f0f0]">
+                  <div
+                    className="img-aritzia absolute inset-0 bg-cover bg-center"
+                    style={bg(cat.image)}
+                  />
+                  <div className="absolute inset-0 bg-black/0 transition-colors duration-700 group-hover:bg-black/10" />
                 </div>
+                <p className="mt-4 text-center text-[11px] font-medium uppercase tracking-[0.2em]">
+                  {cat.name}
+                </p>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <ProductStrip
-        title="New arrivals"
-        eyebrow="Fresh now"
-        href="/shop?isNewArrival=true"
-        products={newArrivals}
-      />
+      {/* NEW IN */}
+      <ProductStrip title="New in" href="/shop?isNewArrival=true" products={newArrivals} />
 
-      {/* PROMO + FEATURES */}
-      <section className="section-pad pt-4">
-        <div className="container-page grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
-          <Link
-            href={promo?.href || "/shop?isBestSeller=true"}
-            className="group relative min-h-[560px] overflow-hidden rounded-3xl bg-black text-white shadow-soft lg:min-h-[620px]"
-          >
+      {/* PROMO — single full-width Zara moment */}
+      {promo && (
+        <section className="relative">
+          <Link href={promo.href || "/shop"} className="group relative block h-[70vh] min-h-[420px] max-h-[720px] overflow-hidden bg-black text-white">
             <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-              style={bg(promo?.image || defaultHeroSlides[0].image)}
+              className="img-aritzia absolute inset-0 bg-cover bg-center"
+              style={bg(promo.image)}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-            <div className="absolute bottom-0 max-w-xl p-7 sm:p-10">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/55">
-                {promo?.eyebrow || "Trending collection"}
+            <div className="absolute inset-0 bg-black/30" />
+            <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
+              <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-white/70">
+                {promo.eyebrow}
               </p>
-              <h2 className="mt-4 font-display text-4xl font-medium leading-tight sm:text-5xl">
-                {promo?.title || "Built for the daily spotlight."}
+              <h2 className="mt-4 max-w-2xl font-display text-4xl font-normal tracking-tight sm:text-5xl md:text-6xl">
+                {promo.title}
               </h2>
-              <p className="mt-4 text-sm leading-relaxed text-white/70 sm:text-base">{promo?.copy}</p>
-              <span className="mt-7 inline-flex items-center gap-2 text-sm font-medium">
-                {promo?.cta || "Explore best sellers"}
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              {promo.copy && (
+                <p className="mt-4 max-w-md text-sm font-light text-white/75">{promo.copy}</p>
+              )}
+              <span className="mt-8 border border-white/80 px-10 py-3.5 text-[10px] font-medium uppercase tracking-[0.28em] transition-colors duration-500 group-hover:bg-white group-hover:text-black">
+                {promo.cta || "Discover"}
               </span>
             </div>
           </Link>
+        </section>
+      )}
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
-            {featureCards.map((item) => (
-              <Link
-                key={item.title}
-                href={item.href}
-                className="group relative min-h-[260px] overflow-hidden rounded-3xl bg-muted shadow-soft lg:min-h-[290px]"
-              >
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                  style={bg(item.image)}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                <div className="absolute bottom-0 p-6 text-white">
-                  <h3 className="font-display text-2xl font-medium sm:text-3xl">{item.title}</h3>
-                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/65">Shop now</p>
+      {/* FEATURE TILES */}
+      {(hp.featureCards?.length ?? 0) > 0 && (
+        <section className="section-lv">
+          <div className="container-page grid gap-3 md:grid-cols-2 md:gap-4">
+            {hp.featureCards.map((item) => (
+              <Link key={item.title} href={item.href} className="group relative block">
+                <div className="relative aspect-[16/10] overflow-hidden bg-[#f0f0f0] md:aspect-[5/3]">
+                  <div
+                    className="img-aritzia absolute inset-0 bg-cover bg-center"
+                    style={bg(item.image)}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute bottom-0 left-0 p-6 sm:p-8">
+                    <h3 className="font-display text-2xl font-normal text-white sm:text-3xl">
+                      {item.title}
+                    </h3>
+                    <span className="mt-3 inline-block text-[10px] font-medium uppercase tracking-[0.22em] text-white/80">
+                      Shop now
+                    </span>
+                  </div>
                 </div>
               </Link>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <ProductStrip
-        title="Best sellers"
-        eyebrow="Customer favorites"
-        href="/shop?isBestSeller=true"
-        products={bestSellers}
-        muted
-      />
-
-      {/* PROMISES */}
-      {promises.length > 0 && (
-        <section className="section-pad">
-          <div className="container-page">
-            <div className="grid gap-6 rounded-3xl border border-border/70 bg-card p-8 shadow-soft sm:grid-cols-2 lg:grid-cols-4 lg:p-10">
-              {promises.map((item, i) => {
-                const Icon = promiseIcons[i % promiseIcons.length];
-                return (
-                  <div key={item.title + i} className="space-y-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <h3 className="font-medium">{item.title}</h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{item.copy}</p>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </section>
       )}
 
-      {/* SOCIAL PROOF */}
-      {(testimonials.length > 0 || galleryImages.length > 0) && (
-        <section className="bg-[#0c0b0a] px-4 py-16 text-white sm:px-6 lg:px-8 lg:py-24">
-          <div className="container-page grid gap-12 lg:grid-cols-[.85fr_1.15fr] lg:items-center">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/40">
-                Social proof
-              </p>
-              <h2 className="mt-4 font-display text-4xl font-medium tracking-tight sm:text-5xl">
-                Real wardrobes. Real confidence.
-              </h2>
-              <div className="mt-8 grid gap-4">
-                {testimonials.map((quote) => (
-                  <div
-                    key={quote}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur"
-                  >
-                    <div className="mb-3 flex gap-1 text-gold">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className="h-3.5 w-3.5 fill-current" />
-                      ))}
-                    </div>
-                    <p className="text-sm leading-relaxed text-white/70">{quote}</p>
-                  </div>
-                ))}
+      <ProductStrip title="Bestsellers" href="/shop?isBestSeller=true" products={bestSellers} muted />
+
+      {/* TRUST — LV quiet strip */}
+      {(hp.promises?.length ?? 0) > 0 && (
+        <section className="border-t border-border">
+          <div className="container-page grid gap-10 px-5 py-16 sm:px-8 md:grid-cols-2 lg:grid-cols-4 lg:px-12 lg:py-20 xl:px-16">
+            {hp.promises.map((p) => (
+              <div key={p.title} className="text-center md:text-left">
+                <h3 className="text-[11px] font-medium uppercase tracking-[0.18em]">{p.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{p.copy}</p>
               </div>
-            </div>
-            {galleryImages.length > 0 && (
-              <div className="grid grid-cols-6 gap-3">
-                {galleryImages.map((image, index) => (
-                  <div
-                    key={image + index}
-                    className={
-                      (index === 0 || index === 3 ? "col-span-4" : "col-span-2") +
-                      " min-h-[180px] rounded-2xl bg-cover bg-center shadow-soft"
-                    }
-                    style={bg(image)}
-                  />
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         </section>
       )}
@@ -376,44 +297,34 @@ export function PremiumHomePage() {
 
 function ProductStrip({
   title,
-  eyebrow,
   href,
   products,
-  muted = false,
+  muted,
 }: {
   title: string;
-  eyebrow: string;
   href: string;
   products: Product[];
   muted?: boolean;
 }) {
   return (
-    <section className={(muted ? "bg-surface" : "bg-background") + " section-pad"}>
+    <section className={(muted ? "bg-surface" : "bg-background") + " section-lv"}>
       <div className="container-page">
-        <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="eyebrow">{eyebrow}</p>
-            <h2 className="mt-3 font-display text-4xl font-medium tracking-tight sm:text-5xl">
-              {title}
-            </h2>
-          </div>
-          <Button asChild variant="outline" className="w-fit">
-            <Link href={href}>
-              View all
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+        <div className="mb-12 flex items-end justify-between gap-4">
+          <h2 className="font-display text-3xl font-normal tracking-tight sm:text-4xl">{title}</h2>
+          <Link
+            href={href}
+            className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            View all
+          </Link>
         </div>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:gap-6">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+        <div className="grid grid-cols-2 gap-x-3 gap-y-10 md:grid-cols-4 md:gap-x-5 md:gap-y-14">
+          {products.slice(0, 8).map((p) => (
+            <ProductCard key={p.id} product={p} />
           ))}
           {!products.length &&
-            Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="aspect-[3/4] animate-pulse rounded-2xl bg-muted"
-              />
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="aspect-[3/4] animate-pulse bg-[#f0f0f0]" />
             ))}
         </div>
       </div>

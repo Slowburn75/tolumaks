@@ -10,25 +10,25 @@ interface ProductGridProps {
   columns?: 2 | 3 | 4;
 }
 
-export function ProductGrid({ products, isLoading, columns = 4 }: ProductGridProps) {
-  if (isLoading) return <ProductGridSkeleton count={8} />;
+export function ProductGrid({ products, isLoading, columns = 3 }: ProductGridProps) {
+  if (isLoading) return <ProductGridSkeleton count={12} />;
 
   if (!products || products.length === 0) {
     return (
-      <div className="text-center py-16">
-        <p className="text-lg text-muted-foreground">No products found.</p>
+      <div className="py-24 text-center">
+        <p className="text-sm tracking-wide text-muted-foreground">No products found.</p>
       </div>
     );
   }
 
   const gridCols = {
-    2: "grid-cols-2 md:grid-cols-2",
+    2: "grid-cols-2",
     3: "grid-cols-2 md:grid-cols-3",
-    4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+    4: "grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
   };
 
   return (
-    <div className={`grid ${gridCols[columns]} gap-4 md:gap-6`}>
+    <div className={`grid ${gridCols[columns]} gap-x-3 gap-y-10 md:gap-x-5 md:gap-y-14`}>
       {products.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}

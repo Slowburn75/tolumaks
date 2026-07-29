@@ -79,30 +79,27 @@ export function CheckoutForm() {
   };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-8">
-        <div className="flex items-center justify-between">
+    <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
+      <div className="space-y-8 bg-background p-6 sm:p-8 lg:p-10">
+        {/* Apple-like step labels */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-6">
           {steps.map((s, i) => (
-            <div key={s} className="flex items-center">
-              <div
+            <div key={s} className="flex items-center gap-2">
+              <span
                 className={cn(
-                  "flex items-center gap-2",
-                  i <= step ? "text-primary" : "text-muted-foreground"
+                  "text-[10px] font-medium uppercase tracking-[0.18em]",
+                  i === step ? "text-foreground" : i < step ? "text-foreground/60" : "text-muted-foreground"
                 )}
               >
-                <div
-                  className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-                    i < step || i === step
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  )}
-                >
-                  {i < step ? <Check className="h-4 w-4" /> : i + 1}
-                </div>
-                <span className="text-sm font-medium hidden sm:block">{s}</span>
-              </div>
-              {i < steps.length - 1 && <div className="w-8 sm:w-16 h-px bg-muted mx-2" />}
+                {i < step ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Check className="h-3 w-3" strokeWidth={1.5} /> {s}
+                  </span>
+                ) : (
+                  `${i + 1}. ${s}`
+                )}
+              </span>
+              {i < steps.length - 1 && <span className="hidden text-border sm:inline">/</span>}
             </div>
           ))}
         </div>
@@ -110,7 +107,7 @@ export function CheckoutForm() {
         <div>
           {step === 0 && (
             <div className="animate-fade-in">
-              <h2 className="text-xl font-semibold mb-6">Shipping Address</h2>
+              <h2 className="mb-6 font-display text-2xl font-normal tracking-tight">Shipping</h2>
               <AddressForm
                 onSubmit={(data) => {
                   setAddress(data);
@@ -122,7 +119,7 @@ export function CheckoutForm() {
           )}
           {step === 1 && (
             <div className="animate-fade-in">
-              <h2 className="text-xl font-semibold mb-6">Delivery Method</h2>
+              <h2 className="mb-6 font-display text-2xl font-normal tracking-tight">Delivery</h2>
               <DeliveryMethod value={delivery} onChange={setDelivery} subtotal={subtotal} />
               <div className="flex justify-between mt-6">
                 <Button variant="outline" onClick={() => setStep(0)}>
@@ -134,7 +131,7 @@ export function CheckoutForm() {
           )}
           {step === 2 && (
             <div className="animate-fade-in">
-              <h2 className="text-xl font-semibold mb-6">Payment Method</h2>
+              <h2 className="mb-6 font-display text-2xl font-normal tracking-tight">Payment</h2>
               <PaymentMethod value={payment} onChange={() => {}} />
               <div className="flex justify-between mt-6">
                 <Button variant="outline" onClick={() => setStep(1)}>
@@ -146,8 +143,8 @@ export function CheckoutForm() {
           )}
           {step === 3 && (
             <div className="animate-fade-in">
-              <h2 className="text-xl font-semibold mb-6">Review Your Order</h2>
-              <div className="space-y-4 border rounded-lg p-6">
+              <h2 className="mb-6 font-display text-2xl font-normal tracking-tight">Review</h2>
+              <div className="space-y-4 border border-border p-6">
                 <div>
                   <h3 className="font-medium mb-2">Shipping To</h3>
                   <div className="text-sm text-muted-foreground space-y-1">

@@ -2,55 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Luxury fashion system
+  Type: Dior (Didot-like display + refined sans)
+  Space: Louis Vuitton (generous rhythm)
+  Motion: Aritzia (slow image, soft fades)
+*/
+
 @layer base {
   :root {
-    /* Warm modern fashion palette */
-    --background: 40 33% 99%;
-    --foreground: 24 12% 10%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
     --card: 0 0% 100%;
-    --card-foreground: 24 12% 10%;
+    --card-foreground: 0 0% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 24 12% 10%;
-    --primary: 24 12% 10%;
-    --primary-foreground: 40 33% 99%;
-    --secondary: 36 28% 95%;
-    --secondary-foreground: 24 12% 12%;
-    --muted: 36 20% 96%;
-    --muted-foreground: 25 8% 42%;
-    --accent: 38 55% 92%;
-    --accent-foreground: 24 12% 12%;
-    --destructive: 0 72% 51%;
+    --popover-foreground: 0 0% 7%;
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96.5%;
+    --secondary-foreground: 0 0% 7%;
+    --muted: 0 0% 97%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 7%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
-    --border: 30 14% 90%;
-    --input: 30 14% 90%;
-    --ring: 24 12% 10%;
-    --radius: 1rem;
-    --gold: 38 48% 48%;
-    --surface: 36 30% 97%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 7%;
+    --radius: 0px;
+    --gold: 38 22% 48%;
+    --surface: 0 0% 98.5%;
+    --ease-luxury: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .dark {
-    --background: 24 12% 6%;
-    --foreground: 40 20% 96%;
-    --card: 24 10% 9%;
-    --card-foreground: 40 20% 96%;
-    --popover: 24 10% 9%;
-    --popover-foreground: 40 20% 96%;
-    --primary: 40 20% 96%;
-    --primary-foreground: 24 12% 8%;
-    --secondary: 24 8% 14%;
-    --secondary-foreground: 40 20% 96%;
-    --muted: 24 8% 14%;
-    --muted-foreground: 30 10% 62%;
-    --accent: 24 8% 16%;
-    --accent-foreground: 40 20% 96%;
-    --destructive: 0 62% 40%;
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 55% 40%;
     --destructive-foreground: 0 0% 100%;
-    --border: 24 8% 18%;
-    --input: 24 8% 18%;
-    --ring: 40 20% 96%;
-    --gold: 38 42% 55%;
-    --surface: 24 10% 10%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 98%;
+    --gold: 38 28% 58%;
+    --surface: 0 0% 8%;
   }
 }
 
@@ -65,15 +73,142 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "ss01" on, "cv11" on;
+    font-feature-settings: "kern" 1, "liga" 1;
+    letter-spacing: 0.01em;
   }
 
   h1, h2, h3, h4 {
-    @apply tracking-tight text-balance;
+    text-wrap: balance;
+  }
+
+  /* Dior-like display: high contrast, tight leading, wide tracking on small caps */
+  .font-display {
+    letter-spacing: -0.02em;
   }
 
   button, a, input, select, textarea {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: hsl(0 0% 7% / 0.12);
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .section-lv {
+    @apply px-5 py-20 sm:px-8 lg:px-12 lg:py-28 xl:px-16;
+  }
+
+  .eyebrow-dior {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.32em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .nav-link-farfetch {
+    position: relative;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: hsl(var(--foreground) / 0.8);
+    transition: color 300ms ease;
+  }
+
+  .nav-link-farfetch:hover {
+    color: hsl(var(--foreground));
+  }
+
+  .nav-link-farfetch::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    width: 100%;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.45s var(--ease-luxury);
+  }
+
+  .nav-link-farfetch:hover::after {
+    transform: scaleX(1);
+  }
+
+  .img-aritzia {
+    transition-property: transform;
+    transition-duration: 900ms;
+    transition-timing-function: var(--ease-luxury);
+  }
+
+  .group:hover .img-aritzia,
+  .group-hover\/img:hover .img-aritzia {
+    transform: scale(1.04);
+  }
+
+  .fade-up {
+    animation: fade-up 0.8s var(--ease-luxury) both;
+  }
+
+  .btn-luxury {
+    display: inline-flex;
+    height: 3rem;
+    align-items: center;
+    justify-content: center;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    transition: all 300ms ease;
+  }
+
+  .btn-luxury-solid {
+    background-color: hsl(var(--foreground));
+    color: hsl(var(--background));
+  }
+
+  .btn-luxury-solid:hover {
+    background-color: hsl(var(--foreground) / 0.9);
+  }
+
+  .btn-luxury-outline {
+    border: 1px solid hsl(var(--foreground) / 0.2);
+    background: transparent;
+  }
+
+  .btn-luxury-outline:hover {
+    border-color: hsl(var(--foreground));
+    background-color: hsl(var(--foreground));
+    color: hsl(var(--background));
+  }
+
+  .divider-thin {
+    height: 1px;
+    width: 100%;
+    background-color: hsl(var(--border));
+  }
+
+  .ssense-price {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.025em;
+  }
+
+  .apple-panel {
+    background-color: #f5f5f7;
   }
 }
 
@@ -82,62 +217,33 @@
     text-wrap: balance;
   }
 
-  .glass {
-    @apply border border-white/40 bg-white/70 shadow-sm backdrop-blur-xl;
-  }
-
-  .glass-dark {
-    @apply border border-white/10 bg-black/40 shadow-sm backdrop-blur-xl;
-  }
-
-  .surface-soft {
-    background-color: hsl(var(--surface));
-  }
-
   .text-gold {
     color: hsl(var(--gold));
   }
 
-  .bg-mesh {
-    background-image:
-      radial-gradient(at 0% 0%, hsl(38 55% 92% / 0.9) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, hsl(36 30% 96% / 0.8) 0px, transparent 45%),
-      radial-gradient(at 100% 100%, hsl(30 20% 94% / 0.7) 0px, transparent 50%);
+  .bg-surface {
+    background-color: hsl(var(--surface));
   }
 
-  .section-pad {
-    @apply px-4 py-16 sm:px-6 lg:px-8 lg:py-24;
-  }
-
-  .container-page {
-    @apply mx-auto max-w-7xl;
-  }
-
-  .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground;
-  }
-
-  .heading-display {
-    @apply font-display font-medium tracking-tight;
-  }
-
-  .card-modern {
-    @apply rounded-2xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(24,20,15,0.04),0_8px_24px_rgba(24,20,15,0.04)];
-  }
-
-  .interactive-lift {
-    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(24,20,15,0.1)];
+  .duration-luxury {
+    transition-duration: 700ms;
+    transition-timing-function: var(--ease-luxury);
   }
 }
 
-::selection {
-  background-color: hsl(var(--primary) / 0.12);
-  color: hsl(var(--foreground));
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -145,13 +251,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.22);
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
+  background: hsl(0 0% 0% / 0.15);
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.4);
-  background-clip: content-box;
+  background: hsl(0 0% 0% / 0.28);
 }

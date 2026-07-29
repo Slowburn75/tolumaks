@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Outfit, Cormorant_Garamond } from "next/font/google";
+import { Manrope, Bodoni_Moda } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const outfit = Outfit({
+/* Dior-adjacent: high-contrast Didot display + refined modern sans */
+const sans = Manrope({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  variable: "--font-sans",
   display: "swap",
 });
 
-const display = Cormorant_Garamond({
+const display = Bodoni_Moda({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-display",
@@ -18,18 +19,18 @@ const display = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: {
-    default: "Tolumak — Modern Fashion",
+    default: "Tolumak",
     template: "%s | Tolumak",
   },
   description:
-    "Premium fashion for the modern individual. Discover curated clothing, shoes, bags, and accessories.",
-  keywords: ["fashion", "clothing", "Nigeria", "online store", "shoes", "bags", "accessories"],
+    "Modern fashion house. Curated clothing, shoes, bags, and accessories.",
+  keywords: ["fashion", "clothing", "Nigeria", "luxury", "online store"],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${outfit.variable} ${display.variable} font-sans`}>
+      <body className={`${sans.variable} ${display.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>

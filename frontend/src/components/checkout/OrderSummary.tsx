@@ -30,8 +30,8 @@ export function OrderSummary({
   placeOrderDisabled = false,
 }: OrderSummaryProps) {
   return (
-    <div className="border rounded-lg p-6 space-y-4 sticky top-24">
-      <h3 className="font-semibold text-lg">Order Summary</h3>
+    <div className="sticky top-24 space-y-5 border border-border bg-background p-6 sm:p-8">
+      <h3 className="text-[11px] font-medium uppercase tracking-[0.18em]">Order summary</h3>
 
       <div className="space-y-3 max-h-60 overflow-y-auto">
         {items.map((item, index) => (

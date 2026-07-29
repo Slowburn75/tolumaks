@@ -1,9 +1,14 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../auth/email.service';
+import { ContactDto } from './newsletter.dto';
 
 @Injectable()
 export class NewsletterService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   async subscribe(email: string) {
     const existing = await this.prisma.newsletterSubscriber.findUnique({ where: { email } });
@@ -39,6 +44,25 @@ export class NewsletterService {
   async deleteSubscriber(id: string) {
     await this.prisma.newsletterSubscriber.delete({ where: { id } });
     return { message: 'Subscriber deleted successfully' };
+  }
+
+  async submitContact(dto: ContactDto) {
+    const saved = await this.prisma.contactMessage.create({
+      data: {
+        name: dto.name,
+        email: dto.email.toLowerCase(),
+        subject: dto.subject,
+        message: dto.message,
+      },
+    });
+
+    try {
+      await this.emailService.sendContactNotification(dto);
+    } catch {
+      // stored even if email fails
+    }
+
+    return { message: 'Message received. We will get back to you soon.', id: saved.id };
   }
 
   async getSubscribers(page?: number, limit?: number) {

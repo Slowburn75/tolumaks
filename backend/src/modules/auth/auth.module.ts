@@ -7,12 +7,13 @@ import { EmailService } from './email.service';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtRefreshStrategy } from './jwt-refresh.strategy';
 import { UsersModule } from '../users/users.module';
+import { getJwtSecret } from '../../config/env';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+      secret: getJwtSecret(),
       signOptions: { expiresIn: process.env.JWT_EXPIRATION || '15m' },
     }),
     UsersModule,

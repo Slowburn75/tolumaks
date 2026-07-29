@@ -151,6 +151,7 @@ export interface OrderItem {
   price: number;
   size?: string;
   color?: string;
+  image?: string;
   createdAt: string;
 }
 

@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Patch, Body, Res, Req, UseGuards, HttpCode } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, VerifyEmailDto, UpdateProfileDto, ChangePasswordDto } from './auth.dto';
@@ -10,12 +11,14 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Post('login')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     return this.authService.login(dto, res);
   }
@@ -29,15 +32,13 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(200)
-  async refresh(@Req() req: Request) {
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
-      return { message: 'No refresh token' };
+      return { message: 'No refresh token', accessToken: null };
     }
-    const payload = this.authService['jwtService'].verify(refreshToken, {
-      secret: process.env.JWT_REFRESH_SECRET || 'super-secret-refresh-key-change-in-production',
-    });
-    return this.authService.refresh(payload.sub, refreshToken);
+    return this.authService.refreshFromToken(refreshToken, res);
   }
 
   @Post('verify-email')
@@ -48,12 +49,14 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(200)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
 
   @Post('reset-password')
   @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.password, dto.confirmPassword);
   }

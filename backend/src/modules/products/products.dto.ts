@@ -271,8 +271,29 @@ export class ProductFilterDto {
   @IsString()
   sortBy?: string;
 
+  /** Alias used by some clients (e.g. sort=price_asc) */
+  @IsOptional()
+  @IsString()
+  sort?: string;
+
   @IsOptional()
   sortOrder?: 'asc' | 'desc';
+
+  @IsOptional()
+  @IsBoolean()
+  isSale?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isNewArrival?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isBestSeller?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
 
   @IsOptional()
   @Type(() => Number)

@@ -47,6 +47,14 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, dto);
   }
 
+  /** Confirm bank transfer received (sets payment + order to PAID) */
+  @Post('admin/orders/:id/confirm-payment')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async confirmBankPayment(@Param('id') id: string) {
+    return this.ordersService.confirmBankPayment(id);
+  }
+
   @Patch('admin/orders/:id/tracking')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')

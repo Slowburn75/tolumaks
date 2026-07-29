@@ -29,13 +29,35 @@ export class ReviewsService {
 
     return {
       data: reviews,
-      meta: { page, limit, total, totalPages: Math.ceil(total / limit), averageRating: Math.round((aggregates._avg.rating || 0) * 10) / 10, totalReviews: aggregates._count.rating },
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        averageRating: Math.round((aggregates._avg.rating || 0) * 10) / 10,
+        totalReviews: aggregates._count.rating,
+      },
     };
   }
 
   async create(userId: string, dto: CreateReviewDto) {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException('Product not found');
+
+    const purchased = await this.prisma.orderItem.findFirst({
+      where: {
+        productId: dto.productId,
+        order: {
+          userId,
+          status: { in: ['DELIVERED', 'PAID', 'PROCESSING', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY'] },
+          paymentStatus: 'PAID',
+        },
+      },
+    });
+
+    if (!purchased) {
+      throw new BadRequestException('You can only review products you have purchased');
+    }
 
     const existingReview = await this.prisma.review.findFirst({
       where: { userId, productId: dto.productId },

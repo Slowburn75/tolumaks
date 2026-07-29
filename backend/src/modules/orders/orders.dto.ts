@@ -74,6 +74,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   deliveryMethod?: string;
+
+  /** Currently only bank_transfer is supported */
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 
 export class UpdateOrderStatusDto {

@@ -69,4 +69,15 @@ export class EmailService {
     `;
     await this.sendMail(to, `Order #${orderNumber} ${status.toLowerCase()}`, html);
   }
+
+  async sendContactNotification(dto: { name: string; email: string; subject: string; message: string }): Promise<void> {
+    const to = process.env.CONTACT_EMAIL || process.env.EMAIL_USER || 'hello@tolumak.com';
+    const html = `
+      <h1>New contact form message</h1>
+      <p><strong>From:</strong> ${dto.name} &lt;${dto.email}&gt;</p>
+      <p><strong>Subject:</strong> ${dto.subject}</p>
+      <p>${dto.message.replace(/\n/g, '<br/>')}</p>
+    `;
+    await this.sendMail(to, `[Contact] ${dto.subject}`, html);
+  }
 }

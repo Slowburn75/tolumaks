@@ -2,6 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
+  skipAuthRefresh?: boolean;
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
@@ -26,10 +27,55 @@ function getToken(): string | null {
   return null;
 }
 
+function setToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    const stored = localStorage.getItem("tolumak-auth");
+    if (!stored) return;
+    const parsed = JSON.parse(stored);
+    parsed.state = { ...parsed.state, token };
+    localStorage.setItem("tolumak-auth", JSON.stringify(parsed));
+  } catch {}
+}
+
+/** Unwrap Nest TransformInterceptor `{ success, data }` envelopes */
+export function unwrapData<T>(res: unknown): T {
+  if (res && typeof res === "object" && "data" in res && "success" in res) {
+    return (res as { data: T }).data;
+  }
+  return res as T;
+}
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function tryRefreshToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return null;
+      const json = await response.json();
+      const data = unwrapData<{ accessToken?: string | null }>(json);
+      const token = data?.accessToken ?? (json as { accessToken?: string }).accessToken ?? null;
+      if (token) setToken(token);
+      return token;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 async function request<T>(path: string, options: FetchOptions = {}): Promise<T> {
-  const { params, ...fetchOptions } = options;
+  const { params, skipAuthRefresh, ...fetchOptions } = options;
   const url = buildUrl(path, params);
-  const token = await getToken();
+  let token = getToken();
 
   const isFormData = fetchOptions.body instanceof FormData;
   const headers: Record<string, string> = {
@@ -39,11 +85,29 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const response = await fetch(url, { ...fetchOptions, headers });
+  let response = await fetch(url, {
+    ...fetchOptions,
+    headers,
+    credentials: "include",
+  });
+
+  if (response.status === 401 && !skipAuthRefresh && !path.includes("/auth/login") && !path.includes("/auth/refresh")) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      response = await fetch(url, {
+        ...fetchOptions,
+        headers,
+        credentials: "include",
+      });
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: "Network error" }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    const raw = error.message ?? error.data?.message;
+    const message = Array.isArray(raw) ? raw.join(", ") : raw || `HTTP ${response.status}`;
+    throw new Error(message);
   }
 
   return response.json();
@@ -52,27 +116,33 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 export const api = {
   get: <T>(path: string, params?: Record<string, string | number | boolean | undefined>) =>
     request<T>(path, { method: "GET", params }),
-  post: <T>(path: string, data?: unknown) =>
-    request<T>(path, { method: "POST", body: data instanceof FormData ? data : data ? JSON.stringify(data) : undefined }),
+  post: <T>(path: string, data?: unknown, opts?: FetchOptions) =>
+    request<T>(path, {
+      method: "POST",
+      body: data instanceof FormData ? data : data ? JSON.stringify(data) : undefined,
+      ...opts,
+    }),
   put: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "PUT", body: data ? JSON.stringify(data) : undefined }),
   patch: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "PATCH", body: data ? JSON.stringify(data) : undefined }),
-  delete: <T>(path: string) =>
-    request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
 export const authApi = {
   login: (data: { email: string; password: string }) => api.post("/auth/login", data),
-  register: (data: { name: string; email: string; password: string; confirmPassword: string }) => api.post("/auth/register", data),
-  logout: () => api.post("/auth/logout"),
-  refresh: () => api.post("/auth/refresh"),
+  register: (data: { name: string; email: string; password: string; confirmPassword: string }) =>
+    api.post("/auth/register", data),
+  logout: () => api.post("/auth/logout", undefined, { skipAuthRefresh: true }),
+  refresh: () => api.post("/auth/refresh", undefined, { skipAuthRefresh: true }),
   getMe: () => api.get("/auth/me"),
   updateProfile: (data: FormData | Record<string, unknown>) => api.patch("/auth/me", data),
   changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
     api.patch("/auth/change-password", data),
   forgotPassword: (email: string) => api.post("/auth/forgot-password", { email }),
-  resetPassword: (data: { token: string; password: string; confirmPassword: string }) => api.post("/auth/reset-password", data),
+  resetPassword: (data: { token: string; password: string; confirmPassword: string }) =>
+    api.post("/auth/reset-password", data),
+  verifyEmail: (token: string) => api.post("/auth/verify-email", { token }),
 };
 
 export const productsApi = {
@@ -83,7 +153,13 @@ export const productsApi = {
   getNewArrivals: (limit?: number) => api.get("/products/new-arrivals", { limit }),
   getBestSellers: (limit?: number) => api.get("/products/best-sellers", { limit }),
   getSale: (limit?: number) => api.get("/products/sale", { limit }),
-  getRelated: (slug: string) => api.get("/products", { search: slug?.replace(/-/g, ' ').split(' ').slice(0,2).join(' '), limit: 4 }).catch(() => []),
+  getRelated: (slug: string) =>
+    api
+      .get("/products", {
+        search: slug?.replace(/-/g, " ").split(" ").slice(0, 2).join(" "),
+        limit: 4,
+      })
+      .catch(() => []),
   search: (query: string) => api.get("/products", { search: query }),
 };
 
@@ -96,14 +172,19 @@ export const brandsApi = {
   getBrands: () => api.get("/brands"),
 };
 
+export const bannersApi = {
+  getActive: () => api.get("/banners"),
+};
+
 export const cartApi = {
   getCart: () => api.get("/cart"),
   addToCart: (data: { productId: string; quantity: number; size?: string; color?: string }) =>
     api.post("/cart/items", data),
-  updateCartItem: (itemId: string, data: { quantity: number }) =>
-    api.patch(`/cart/items/${itemId}`, data),
+  updateCartItem: (itemId: string, data: { quantity: number }) => api.patch(`/cart/items/${itemId}`, data),
   removeCartItem: (itemId: string) => api.delete(`/cart/items/${itemId}`),
   clearCart: () => api.delete("/cart"),
+  mergeCart: (items: Array<{ productId: string; quantity: number; size?: string; color?: string }>) =>
+    api.post("/cart/merge", { items }),
   applyCoupon: (code: string, orderAmount?: number) => api.post("/coupons/validate", { code, orderAmount }),
   removeCoupon: () => Promise.resolve({ message: "Coupon removed" }),
 };
@@ -120,7 +201,7 @@ export const ordersApi = {
     api.get("/orders/me", params),
   getOrder: (id: string) => api.get(`/orders/${id}`),
   trackOrder: (data: { orderNumber: string; email: string }) => api.post("/orders/track", data),
-  cancelOrder: (id: string) => api.patch(`/admin/orders/${id}/status`, { status: 'CANCELLED' }),
+  cancelOrder: (id: string) => api.post(`/orders/${id}/cancel`),
 };
 
 export const reviewsApi = {
@@ -173,6 +254,7 @@ export const adminApi = {
     api.get("/admin/orders", params),
   getOrder: (id: string) => api.get(`/admin/orders/${id}`),
   updateOrderStatus: (id: string, status: string) => api.patch(`/admin/orders/${id}/status`, { status }),
+  confirmBankPayment: (id: string) => api.post(`/admin/orders/${id}/confirm-payment`),
   getCustomers: (params?: Record<string, string | number | boolean | undefined>) =>
     api.get("/admin/customers", params),
   getCustomer: (id: string) => api.get(`/admin/customers/${id}`),
@@ -201,5 +283,5 @@ export const newsletterApi = {
 
 export const contactApi = {
   send: (data: { name: string; email: string; subject: string; message: string }) =>
-    api.post("/newsletter/subscribe", { email: data.email }),
+    api.post("/contact", data),
 };

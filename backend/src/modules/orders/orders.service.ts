@@ -2,7 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../auth/email.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateTrackingDto } from './orders.dto';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { calculateShippingFee } from './shipping';
 
 @Injectable()
 export class OrdersService {
@@ -22,125 +23,205 @@ export class OrdersService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    let subtotal = 0;
-    const orderItemsData: Array<{
-      productId: string;
-      name: string;
-      price: any;
-      quantity: number;
-      size?: string;
-      color?: string;
-      image: string | null;
-    }> = [];
-
-    for (const item of dto.items) {
-      const product = await this.prisma.product.findUnique({
-        where: { id: item.productId },
-        include: { images: { take: 1, orderBy: { order: 'asc' } } },
-      });
-      if (!product || product.status !== 'ACTIVE') {
-        throw new NotFoundException(`Product ${item.productId} not found`);
-      }
-
-      if (item.quantity > product.stockQuantity) {
-        throw new BadRequestException(`Insufficient stock for ${product.name}`);
-      }
-
-      const price = product.discountPrice || product.price;
-      subtotal += Number(price) * item.quantity;
-
-      orderItemsData.push({
-        productId: product.id,
-        name: product.name,
-        price: price,
-        quantity: item.quantity,
-        size: item.size,
-        color: item.color,
-        image: product.images?.[0]?.url || null,
-      });
+    const paymentMethod = (dto.paymentMethod || 'bank_transfer').toLowerCase();
+    if (paymentMethod !== 'bank_transfer') {
+      throw new BadRequestException('Only bank transfer is available at this time. Card payments coming soon.');
     }
 
-    let discount = 0;
-    let couponId: string | null = null;
+    const order = await this.prisma.$transaction(async (tx) => {
+      let subtotal = 0;
+      const orderItemsData: Array<{
+        productId: string;
+        name: string;
+        price: Prisma.Decimal;
+        quantity: number;
+        size?: string;
+        color?: string;
+        image: string | null;
+      }> = [];
 
-    if (dto.couponCode) {
-      const coupon = await this.prisma.coupon.findUnique({ where: { code: dto.couponCode } });
-      if (!coupon || !coupon.isActive) {
-        throw new BadRequestException('Invalid coupon code');
+      for (const item of dto.items) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          include: {
+            images: { take: 1, orderBy: { order: 'asc' } },
+            variants: true,
+          },
+        });
+        if (!product || product.status !== 'ACTIVE') {
+          throw new NotFoundException(`Product ${item.productId} not found`);
+        }
+
+        const variant =
+          product.variants?.length && (item.size || item.color)
+            ? product.variants.find(
+                (v) =>
+                  (!item.size || (v.size || '').toLowerCase() === item.size.toLowerCase()) &&
+                  (!item.color || (v.color || '').toLowerCase() === item.color.toLowerCase()),
+              )
+            : null;
+
+        if (product.variants?.length && (item.size || item.color) && !variant) {
+          throw new BadRequestException(`Selected size/color unavailable for ${product.name}`);
+        }
+
+        if (variant) {
+          const vUpdated = await tx.productVariant.updateMany({
+            where: { id: variant.id, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (vUpdated.count === 0) {
+            throw new BadRequestException(`Insufficient stock for ${product.name}`);
+          }
+          // keep product aggregate in sync
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stockQuantity: { decrement: item.quantity } },
+          });
+        } else {
+          const updated = await tx.product.updateMany({
+            where: { id: product.id, stockQuantity: { gte: item.quantity } },
+            data: { stockQuantity: { decrement: item.quantity } },
+          });
+          if (updated.count === 0) {
+            throw new BadRequestException(`Insufficient stock for ${product.name}`);
+          }
+        }
+
+        const unitPrice = variant?.price ?? product.discountPrice ?? product.price;
+        subtotal += Number(unitPrice) * item.quantity;
+
+        orderItemsData.push({
+          productId: product.id,
+          name: product.name,
+          price: unitPrice,
+          quantity: item.quantity,
+          size: item.size,
+          color: item.color,
+          image: product.images?.[0]?.url || null,
+        });
       }
-      if (coupon.expiresAt && coupon.expiresAt < new Date()) {
-        throw new BadRequestException('Coupon has expired');
+
+      let discount = 0;
+      let couponId: string | null = null;
+      let couponCode: string | null = dto.couponCode || null;
+
+      if (dto.couponCode) {
+        const coupon = await tx.coupon.findUnique({ where: { code: dto.couponCode.toUpperCase() } });
+        if (!coupon || !coupon.isActive) {
+          throw new BadRequestException('Invalid coupon code');
+        }
+        if (coupon.expiresAt && coupon.expiresAt < new Date()) {
+          throw new BadRequestException('Coupon has expired');
+        }
+        if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+          throw new BadRequestException('Coupon usage limit reached');
+        }
+        if (coupon.minOrderAmount && subtotal < Number(coupon.minOrderAmount)) {
+          throw new BadRequestException(`Minimum order amount of ${coupon.minOrderAmount} required`);
+        }
+
+        const maxPerUser = coupon.maxPerUser ?? 1;
+        if (maxPerUser > 0) {
+          const userUses = await tx.couponUsage.count({
+            where: { couponId: coupon.id, userId },
+          });
+          if (userUses >= maxPerUser) {
+            throw new BadRequestException('You have already used this coupon the maximum number of times');
+          }
+        }
+
+        if (coupon.discountType === 'PERCENTAGE') {
+          discount = (subtotal * Number(coupon.discountValue)) / 100;
+        } else {
+          discount = Number(coupon.discountValue);
+        }
+        discount = Math.min(discount, subtotal);
+        couponId = coupon.id;
+        couponCode = coupon.code;
+
+        await tx.coupon.update({
+          where: { id: coupon.id },
+          data: { usedCount: { increment: 1 } },
+        });
       }
-      if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
-        throw new BadRequestException('Coupon usage limit reached');
-      }
-      if (coupon.minOrderAmount && subtotal < Number(coupon.minOrderAmount)) {
-        throw new BadRequestException(`Minimum order amount of ${coupon.minOrderAmount} required`);
-      }
 
-      if (coupon.discountType === 'PERCENTAGE') {
-        discount = (subtotal * Number(coupon.discountValue)) / 100;
-      } else {
-        discount = Number(coupon.discountValue);
-      }
-      couponId = coupon.id;
-    }
+      const shippingFee = calculateShippingFee(dto.deliveryMethod, subtotal);
+      const total = Math.max(0, subtotal - discount + shippingFee);
+      const orderNumber = this.generateOrderNumber();
 
-    const shippingFee = subtotal >= 50000 ? 0 : 2500;
-    const total = Math.max(0, subtotal - discount + shippingFee);
-    const orderNumber = this.generateOrderNumber();
+      const shippingAddress = dto.shippingAddress;
+      const billingAddress = dto.billingAddress || dto.shippingAddress;
 
-    const shippingAddress = dto.shippingAddress;
-    const billingAddress = dto.billingAddress || dto.shippingAddress;
-
-    const order = await this.prisma.order.create({
-      data: {
-        orderNumber,
-        userId,
-        subtotal,
-        shippingFee,
-        discount,
-        total,
-        couponCode: dto.couponCode,
-        shippingAddress: shippingAddress as any,
-        billingAddress: billingAddress as any,
-        deliveryMethod: dto.deliveryMethod,
-        notes: dto.notes,
-        couponId,
-        items: { create: orderItemsData },
-      },
-      include: {
-        items: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
-    });
-
-    for (const item of dto.items) {
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: { stockQuantity: { decrement: item.quantity } },
-      });
-
-      await this.prisma.inventoryLog.create({
+      const created = await tx.order.create({
         data: {
-          productId: item.productId,
-          change: -item.quantity,
-          type: 'ORDER',
-          note: `Order #${orderNumber}`,
+          orderNumber,
+          userId,
+          status: 'PENDING',
+          paymentStatus: 'PENDING',
+          subtotal,
+          shippingFee,
+          discount,
+          total,
+          couponCode,
+          shippingAddress: shippingAddress as object,
+          billingAddress: billingAddress as object,
+          deliveryMethod: dto.deliveryMethod || 'standard',
+          notes: dto.notes,
+          couponId,
+          items: { create: orderItemsData },
+          payment: {
+            create: {
+              provider: 'bank_transfer',
+              reference: orderNumber,
+              status: 'pending',
+              amount: total,
+              currency: 'NGN',
+              metadata: {
+                paymentMethod: 'bank_transfer',
+                instructions: 'Transfer the exact total and use the order number as reference.',
+              },
+            },
+          },
+        },
+        include: {
+          items: true,
+          payment: true,
+          user: { select: { id: true, name: true, email: true } },
         },
       });
-    }
 
-    if (couponId) {
-      await this.prisma.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } },
-      });
-    }
+      if (couponId) {
+        await tx.couponUsage.create({
+          data: { couponId, userId, orderId: created.id },
+        });
+      }
+
+      for (const item of dto.items) {
+        await tx.inventoryLog.create({
+          data: {
+            productId: item.productId,
+            change: -item.quantity,
+            type: 'ORDER',
+            note: `Order #${orderNumber} (awaiting bank transfer)`,
+          },
+        });
+      }
+
+      // Clear server cart after successful order
+      const cart = await tx.cart.findUnique({ where: { userId } });
+      if (cart) {
+        await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+      }
+
+      return created;
+    });
 
     try {
-      await this.emailService.sendOrderConfirmationEmail(user.email, orderNumber);
-    } catch {}
+      await this.emailService.sendOrderConfirmationEmail(user.email, order.orderNumber);
+    } catch {
+      // non-fatal
+    }
 
     return order;
   }
@@ -169,7 +250,7 @@ export class OrdersService {
   }
 
   async findById(id: string, userId?: string) {
-    const where: any = { id };
+    const where: { id: string; userId?: string } = { id };
     if (userId) where.userId = userId;
 
     const order = await this.prisma.order.findFirst({
@@ -212,6 +293,7 @@ export class OrdersService {
             price: true,
           },
         },
+        payment: true,
       },
     });
 
@@ -221,10 +303,10 @@ export class OrdersService {
 
   async findAll(page = 1, limit = 20, status?: string, search?: string, userId?: string) {
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: Prisma.OrderWhereInput = {};
 
     if (userId) where.userId = userId;
-    if (status) where.status = status;
+    if (status) where.status = status as OrderStatus;
     if (search) {
       where.OR = [
         { orderNumber: { contains: search, mode: 'insensitive' } },
@@ -253,11 +335,79 @@ export class OrdersService {
     };
   }
 
-  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
+  /**
+   * Admin confirms bank transfer received → mark order + payment as PAID.
+   */
+  async confirmBankPayment(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { payment: true, user: { select: { email: true } } },
+    });
     if (!order) throw new NotFoundException('Order not found');
 
-    const validStatuses = ['PENDING', 'PAID', 'PROCESSING', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED'];
+    if (order.paymentStatus === 'PAID') {
+      throw new BadRequestException('Order payment is already confirmed');
+    }
+    if (order.status === 'CANCELLED') {
+      throw new BadRequestException('Cannot confirm payment on a cancelled order');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.order.update({
+        where: { id },
+        data: {
+          paymentStatus: 'PAID' as PaymentStatus,
+          status: 'PAID' as OrderStatus,
+          paidAt: new Date(),
+        },
+        include: {
+          items: true,
+          payment: true,
+          user: { select: { id: true, name: true, email: true, phone: true } },
+        },
+      });
+
+      if (order.payment) {
+        await tx.payment.update({
+          where: { orderId: id },
+          data: { status: 'success' },
+        });
+      } else {
+        await tx.payment.create({
+          data: {
+            orderId: id,
+            provider: 'bank_transfer',
+            reference: order.orderNumber,
+            status: 'success',
+            amount: order.total,
+            currency: 'NGN',
+          },
+        });
+      }
+
+      return next;
+    });
+
+    try {
+      await this.emailService.sendOrderStatusUpdateEmail(order.user.email, order.orderNumber, 'PAID');
+    } catch {
+      // non-fatal
+    }
+
+    return updated;
+  }
+
+  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const validStatuses = [
+      'PENDING', 'PAID', 'PROCESSING', 'PACKED', 'SHIPPED',
+      'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'RETURNED', 'REFUNDED',
+    ];
 
     const status = dto.status.toUpperCase();
 
@@ -269,20 +419,54 @@ export class OrdersService {
       throw new BadRequestException(`Cannot update status of ${order.status.toLowerCase()} order`);
     }
 
-    const updateData: any = { status: status as OrderStatus };
+    // Cancelling via admin status dropdown should restore stock
+    if (status === 'CANCELLED') {
+      return this.cancelOrderInternal(order.id, order);
+    }
 
-    if (status === 'PAID') updateData.paidAt = new Date();
-    if (status === 'DELIVERED') updateData.deliveredAt = new Date();
+    const updateData: Prisma.OrderUpdateInput = { status: status as OrderStatus };
 
-    const updated = await this.prisma.order.update({
-      where: { id },
-      data: updateData,
-      include: { items: true, user: { select: { email: true } } },
+    if (status === 'PAID') {
+      updateData.paidAt = new Date();
+      updateData.paymentStatus = 'PAID' as PaymentStatus;
+    }
+    if (status === 'DELIVERED') {
+      updateData.deliveredAt = new Date();
+    }
+    if (status === 'REFUNDED') {
+      updateData.paymentStatus = 'REFUNDED' as PaymentStatus;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.order.update({
+        where: { id },
+        data: updateData,
+        include: { items: true, payment: true, user: { select: { email: true } } },
+      });
+
+      if (status === 'PAID' && order.paymentStatus !== 'PAID') {
+        await tx.payment.upsert({
+          where: { orderId: id },
+          create: {
+            orderId: id,
+            provider: 'bank_transfer',
+            reference: order.orderNumber,
+            status: 'success',
+            amount: order.total,
+            currency: 'NGN',
+          },
+          update: { status: 'success' },
+        });
+      }
+
+      return next;
     });
 
     try {
       await this.emailService.sendOrderStatusUpdateEmail(updated.user.email, updated.orderNumber, status);
-    } catch {}
+    } catch {
+      // non-fatal
+    }
 
     return updated;
   }
@@ -290,16 +474,79 @@ export class OrdersService {
   async cancelOrder(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-    });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== 'PENDING' && order.status !== 'PAID') {
-      throw new BadRequestException('Order cannot be cancelled at this stage');
-    }
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'CANCELLED' as OrderStatus },
       include: { items: true },
     });
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Customers may only cancel unpaid pending bank-transfer orders
+    if (order.status !== 'PENDING' || order.paymentStatus === 'PAID') {
+      throw new BadRequestException('Order cannot be cancelled at this stage. Contact support if you need help.');
+    }
+
+    return this.cancelOrderInternal(orderId, order);
+  }
+
+  private async cancelOrderInternal(
+    orderId: string,
+    order: {
+      orderNumber: string;
+      couponId: string | null;
+      items: Array<{ productId: string; quantity: number; size?: string | null; color?: string | null }>;
+    },
+  ) {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockQuantity: { increment: item.quantity } },
+        });
+
+        if (item.size || item.color) {
+          const variants = await tx.productVariant.findMany({ where: { productId: item.productId } });
+          const variant = variants.find(
+            (v) =>
+              (!item.size || (v.size || '').toLowerCase() === (item.size || '').toLowerCase()) &&
+              (!item.color || (v.color || '').toLowerCase() === (item.color || '').toLowerCase()),
+          );
+          if (variant) {
+            await tx.productVariant.update({
+              where: { id: variant.id },
+              data: { stock: { increment: item.quantity } },
+            });
+          }
+        }
+
+        await tx.inventoryLog.create({
+          data: {
+            productId: item.productId,
+            change: item.quantity,
+            type: 'CANCEL',
+            note: `Order #${order.orderNumber} cancelled — stock restored`,
+          },
+        });
+      }
+
+      if (order.couponId) {
+        await tx.coupon.updateMany({
+          where: { id: order.couponId, usedCount: { gt: 0 } },
+          data: { usedCount: { decrement: 1 } },
+        });
+        await tx.couponUsage.deleteMany({ where: { orderId } });
+      }
+
+      await tx.payment.updateMany({
+        where: { orderId, status: 'pending' },
+        data: { status: 'cancelled' },
+      });
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: { status: 'CANCELLED' as OrderStatus },
+        include: { items: true, payment: true },
+      });
+    });
+
+    return updated;
   }
 
   async updateTracking(id: string, dto: UpdateTrackingDto) {

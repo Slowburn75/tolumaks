@@ -2,10 +2,12 @@ import { Injectable, UnauthorizedException, ConflictException, BadRequestExcepti
 import { JwtService } from '@nestjs/jwt';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { Response } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from './email.service';
 import { RegisterDto, LoginDto, UpdateProfileDto } from './auth.dto';
+import { getJwtRefreshSecret, getJwtSecret } from '../../config/env';
 
 @Injectable()
 export class AuthService {
@@ -15,12 +17,17 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
+  /** Store only a hash of the refresh token (sha256 is enough for high-entropy JWTs). */
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
   async register(dto: RegisterDto) {
     if (dto.password !== dto.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
 
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase() } });
     if (existing) {
       throw new ConflictException('Email already registered');
     }
@@ -31,7 +38,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         name: dto.name,
-        email: dto.email,
+        email: dto.email.toLowerCase(),
         password: hashedPassword,
         verificationToken,
       },
@@ -44,7 +51,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, res: Response) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase() } });
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -62,16 +69,10 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: tokens.refreshToken },
+      data: { refreshToken: this.hashToken(tokens.refreshToken) },
     });
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    this.setRefreshCookie(res, tokens.refreshToken);
 
     const { password, refreshToken, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
     return { accessToken: tokens.accessToken, user: safeUser };
@@ -83,13 +84,28 @@ export class AuthService {
       data: { refreshToken: null },
     });
 
-    res.clearCookie('refreshToken', { path: '/' });
+    res.clearCookie('refreshToken', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
     return { message: 'Logged out successfully' };
   }
 
-  async refresh(userId: string, refreshToken: string) {
+  async refresh(userId: string, refreshToken: string, res?: Response) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.refreshToken || user.refreshToken !== refreshToken) {
+    if (!user || !user.refreshToken || user.isBlocked) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const incomingHash = this.hashToken(refreshToken);
+    // Support one deploy window where old plaintext tokens may still exist
+    const matches =
+      user.refreshToken === incomingHash ||
+      user.refreshToken === refreshToken;
+
+    if (!matches) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -97,10 +113,26 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: tokens.refreshToken },
+      data: { refreshToken: this.hashToken(tokens.refreshToken) },
     });
 
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
+    if (res) {
+      this.setRefreshCookie(res, tokens.refreshToken);
+    }
+
+    return { accessToken: tokens.accessToken };
+  }
+
+  /** Verify refresh JWT and rotate tokens */
+  async refreshFromToken(refreshToken: string, res: Response) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: getJwtRefreshSecret(),
+      }) as { sub: string };
+      return this.refresh(payload.sub, refreshToken, res);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 
   async verifyEmail(token: string) {
@@ -118,7 +150,7 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
       return { message: 'If the email exists, a reset link has been sent' };
     }
@@ -156,6 +188,7 @@ export class AuthService {
         password: hashedPassword,
         resetPasswordToken: null,
         resetPasswordExpires: null,
+        refreshToken: null,
       },
     });
 
@@ -210,16 +243,26 @@ export class AuthService {
     return { message: 'Password updated successfully' };
   }
 
+  private setRefreshCookie(res: Response, refreshToken: string) {
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+  }
+
   private async generateTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role };
 
     const accessToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+      secret: getJwtSecret(),
       expiresIn: process.env.JWT_EXPIRATION || '15m',
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'super-secret-refresh-key-change-in-production',
+      secret: getJwtRefreshSecret(),
       expiresIn: process.env.JWT_REFRESH_EXPIRATION || '7d',
     });
 

@@ -25,6 +25,11 @@ export class CreateCouponDto {
   usageLimit?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(1)
+  maxPerUser?: number;
+
+  @IsOptional()
   @IsString()
   expiresAt?: string;
 
@@ -57,6 +62,11 @@ export class UpdateCouponDto {
   @IsNumber()
   @Min(1)
   usageLimit?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  maxPerUser?: number;
 
   @IsOptional()
   @IsString()

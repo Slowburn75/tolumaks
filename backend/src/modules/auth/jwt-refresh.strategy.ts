@@ -2,7 +2,9 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getJwtRefreshSecret } from '../../config/env';
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -11,7 +13,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => req?.cookies?.refreshToken || null,
       ]),
-      secretOrKey: process.env.JWT_REFRESH_SECRET || 'super-secret-refresh-key-change-in-production',
+      secretOrKey: getJwtRefreshSecret(),
       passReqToCallback: true,
     });
   }
@@ -26,7 +28,12 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       where: { id: payload.sub },
     });
 
-    if (!user || !user.refreshToken || user.refreshToken !== refreshToken || user.isBlocked) {
+    const hash = createHash('sha256').update(refreshToken).digest('hex');
+    const matches =
+      !!user?.refreshToken &&
+      (user.refreshToken === hash || user.refreshToken === refreshToken);
+
+    if (!user || !matches || user.isBlocked) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 

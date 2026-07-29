@@ -1,24 +1,35 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Outfit, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const display = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
-    default: "Tolumak - Premium Fashion",
+    default: "Tolumak — Modern Fashion",
     template: "%s | Tolumak",
   },
-  description: "Premium fashion for the modern individual. Discover curated collections of clothing, shoes, bags, and accessories.",
+  description:
+    "Premium fashion for the modern individual. Discover curated clothing, shoes, bags, and accessories.",
   keywords: ["fashion", "clothing", "Nigeria", "online store", "shoes", "bags", "accessories"],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${playfair.variable} font-sans`}>
+      <body className={`${outfit.variable} ${display.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>

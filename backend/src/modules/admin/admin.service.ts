@@ -106,6 +106,24 @@ export class AdminService {
     return user;
   }
 
+  async getSettings() {
+    const row = await this.prisma.storeSetting.findUnique({ where: { id: 'default' } });
+    const { mergeSiteSettings } = await import('./site-settings.defaults');
+    return mergeSiteSettings(row?.data);
+  }
+
+  async updateSettings(settings: Record<string, unknown>) {
+    const { mergeSiteSettings } = await import('./site-settings.defaults');
+    // Admin sends full settings document — merge with defaults so new keys stay safe
+    const merged = mergeSiteSettings(settings);
+    await this.prisma.storeSetting.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', data: merged as object },
+      update: { data: merged as object },
+    });
+    return merged;
+  }
+
   async getAnalytics(startDate?: string, endDate?: string) {
     const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate) : new Date();

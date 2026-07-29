@@ -1,4 +1,5 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Headers, UnauthorizedException } from '@nestjs/common';
+import { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { InitializePaymentDto, VerifyPaymentDto } from './payments.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -33,12 +34,22 @@ export class PaymentsController {
   }
 
   @Post('webhook/paystack')
-  async handlePaystackWebhook(@Body() payload: any) {
+  async handlePaystackWebhook(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Body() payload: any,
+    @Headers('x-paystack-signature') signature?: string,
+  ) {
+    const raw = req.rawBody || Buffer.from(JSON.stringify(payload));
+    this.paymentsService.verifyPaystackSignature(raw, signature);
     return this.paymentsService.handlePaystackWebhook(payload);
   }
 
   @Post('webhook/flutterwave')
-  async handleFlutterwaveWebhook(@Body() payload: any) {
+  async handleFlutterwaveWebhook(
+    @Body() payload: any,
+    @Headers('verif-hash') signature?: string,
+  ) {
+    this.paymentsService.verifyFlutterwaveSignature(signature);
     return this.paymentsService.handleFlutterwaveWebhook(payload);
   }
 }

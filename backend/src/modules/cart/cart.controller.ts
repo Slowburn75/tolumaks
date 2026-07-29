@@ -33,4 +33,12 @@ export class CartController {
   async clearCart(@CurrentUser('id') userId: string) {
     return this.cartService.clearCart(userId);
   }
+
+  @Post('merge')
+  async mergeCart(
+    @CurrentUser('id') userId: string,
+    @Body() body: { items?: Array<{ productId: string; quantity: number; size?: string; color?: string }> },
+  ) {
+    return this.cartService.mergeCart(userId, body.items || []);
+  }
 }

@@ -33,11 +33,11 @@ export class AdminController {
 
   @Get('settings')
   async getSettings() {
-    return { storeName: 'Tolumak', currency: 'NGN', email: 'hello@tolumak.com', phone: '+2348000000000', address: 'Lagos, Nigeria' };
+    return this.adminService.getSettings();
   }
 
   @Patch('settings')
   async updateSettings(@Body() settings: Record<string, unknown>) {
-    return { ...settings };
+    return this.adminService.updateSettings(settings);
   }
 }

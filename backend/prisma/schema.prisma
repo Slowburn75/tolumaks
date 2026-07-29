@@ -67,11 +67,15 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  addresses  Address[]
-  orders     Order[]
-  cart       Cart?
-  wishlist   Wishlist?
-  reviews    Review[]
+  addresses    Address[]
+  orders       Order[]
+  cart         Cart?
+  wishlist     Wishlist?
+  reviews      Review[]
+  couponUsages CouponUsage[]
+
+  @@index([role])
+  @@index([createdAt])
 }
 
 model Category {
@@ -131,6 +135,14 @@ model Product {
   inventoryLogs InventoryLog[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([isFeatured])
+  @@index([isNewArrival])
+  @@index([isBestSeller])
+  @@index([isSale])
+  @@index([gender])
+  @@index([brandId])
 }
 
 model ProductImage {
@@ -187,6 +199,9 @@ model CartItem {
   color     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([cartId])
+  @@index([productId])
 }
 
 model Wishlist {
@@ -233,6 +248,11 @@ model Order {
   coupon          Coupon?      @relation(fields: [couponId], references: [id])
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -263,6 +283,9 @@ model Payment {
   metadata        Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([reference])
+  @@index([status])
 }
 
 model Address {
@@ -290,12 +313,26 @@ model Coupon {
   discountValue Decimal   @db.Decimal(10, 2)
   minOrderAmount Decimal? @db.Decimal(10, 2)
   usageLimit   Int?
+  maxPerUser   Int?       @default(1)
   usedCount    Int        @default(0)
   expiresAt    DateTime?
   isActive     Boolean    @default(true)
   orders       Order[]
+  usages       CouponUsage[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+}
+
+model CouponUsage {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId   String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([couponId, userId])
 }
 
 model Review {
@@ -311,6 +348,10 @@ model Review {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([productId, isApproved])
+  @@index([userId])
+  @@unique([userId, productId])
 }
 
 model InventoryLog {
@@ -340,4 +381,23 @@ model NewsletterSubscriber {
   email     String   @unique
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([isRead])
+}
+
+model StoreSetting {
+  id        String   @id @default("default")
+  data      Json
+  updatedAt DateTime @updatedAt
 }

@@ -15,9 +15,24 @@ export class ProductsService {
   }
 
   async findAll(filter: ProductFilterDto) {
-    const { search, categorySlug, brandSlug, gender, ageGroup, minPrice, maxPrice, colors, sizes, sortBy, sortOrder, page, limit } = filter;
+    const {
+      search, categorySlug, brandSlug, gender, ageGroup, minPrice, maxPrice,
+      colors, sizes, sortBy, sort, sortOrder, page, limit, isSale, isNewArrival, isBestSeller, isFeatured,
+    } = filter as typeof filter & {
+      sort?: string;
+      isSale?: boolean | string;
+      isNewArrival?: boolean | string;
+      isBestSeller?: boolean | string;
+      isFeatured?: boolean | string;
+    };
     const skip = ((page || 1) - 1) * (limit || 20);
     const where: any = { status: 'ACTIVE' };
+
+    const truthy = (v: unknown) => v === true || v === 'true' || v === '1';
+    if (truthy(isSale)) where.isSale = true;
+    if (truthy(isNewArrival)) where.isNewArrival = true;
+    if (truthy(isBestSeller)) where.isBestSeller = true;
+    if (truthy(isFeatured)) where.isFeatured = true;
 
     if (search) {
       where.OR = [
@@ -55,11 +70,15 @@ export class ProductsService {
       where.variants = { ...where.variants, some: { ...(where.variants.some || {}), size: { in: sizeArray, mode: 'insensitive' } } };
     }
 
+    // Accept both sortBy=price + sortOrder, and convenience values like price_asc / latest
     let orderBy: any = { createdAt: 'desc' };
-    if (sortBy === 'price') orderBy = { price: sortOrder || 'asc' };
-    else if (sortBy === 'newest') orderBy = { createdAt: 'desc' };
-    else if (sortBy === 'name') orderBy = { name: sortOrder || 'asc' };
-    else if (sortBy === 'rating') orderBy = { reviews: { _count: 'desc' } };
+    const sortKey = String(sortBy || sort || '').toLowerCase();
+    if (sortKey === 'price' || sortKey === 'price_asc') orderBy = { price: sortOrder || 'asc' };
+    else if (sortKey === 'price_desc') orderBy = { price: 'desc' };
+    else if (sortKey === 'newest' || sortKey === 'latest') orderBy = { createdAt: 'desc' };
+    else if (sortKey === 'name') orderBy = { name: sortOrder || 'asc' };
+    else if (sortKey === 'rating' || sortKey === 'highest_rated') orderBy = { reviews: { _count: 'desc' } };
+    else if (sortKey === 'best_sellers') orderBy = { isBestSeller: 'desc' };
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({

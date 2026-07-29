@@ -59,6 +59,7 @@ export class CouponsService {
         discountValue: dto.discountValue,
         minOrderAmount: dto.minOrderAmount,
         usageLimit: dto.usageLimit,
+        maxPerUser: dto.maxPerUser ?? 1,
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
         isActive: dto.isActive ?? true,
       },

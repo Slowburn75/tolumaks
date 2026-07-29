@@ -14,19 +14,35 @@ interface OrderSummaryProps {
   total: number;
   onPlaceOrder: () => void;
   isLoading?: boolean;
+  placeOrderLabel?: string;
+  placeOrderDisabled?: boolean;
 }
 
-export function OrderSummary({ items, subtotal, shipping, discount, total, onPlaceOrder, isLoading }: OrderSummaryProps) {
+export function OrderSummary({
+  items,
+  subtotal,
+  shipping,
+  discount,
+  total,
+  onPlaceOrder,
+  isLoading,
+  placeOrderLabel = "Place Order",
+  placeOrderDisabled = false,
+}: OrderSummaryProps) {
   return (
     <div className="border rounded-lg p-6 space-y-4 sticky top-24">
       <h3 className="font-semibold text-lg">Order Summary</h3>
 
       <div className="space-y-3 max-h-60 overflow-y-auto">
-        {items.map((item) => (
-          <div key={item.id} className="flex gap-3">
+        {items.map((item, index) => (
+          <div key={item.id || `${item.productId}-${item.size}-${item.color}-${index}`} className="flex gap-3">
             <div className="relative w-14 h-14 bg-muted rounded-md overflow-hidden shrink-0">
               <Image
-                src={item.product.images?.[0]?.url || item.product.images?.[0] || "/placeholder.svg"}
+                src={
+                  (typeof item.product.images?.[0] === "string"
+                    ? item.product.images[0]
+                    : item.product.images?.[0]?.url) || "/placeholder.svg"
+                }
                 alt={item.product.name}
                 fill
                 className="object-cover"
@@ -35,7 +51,11 @@ export function OrderSummary({ items, subtotal, shipping, discount, total, onPla
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium line-clamp-1">{item.product.name}</p>
-              <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+              <p className="text-xs text-muted-foreground">
+                Qty: {item.quantity}
+                {item.size ? ` · ${item.size}` : ""}
+                {item.color ? ` · ${item.color}` : ""}
+              </p>
               <p className="text-sm font-medium">
                 {formatPrice((item.product.discountPrice || item.product.price) * item.quantity)}
               </p>
@@ -70,8 +90,17 @@ export function OrderSummary({ items, subtotal, shipping, discount, total, onPla
         <span>{formatPrice(total)}</span>
       </div>
 
-      <Button className="w-full h-12" size="lg" onClick={onPlaceOrder} disabled={isLoading}>
-        {isLoading ? "Processing..." : "Place Order"}
+      <p className="text-xs text-muted-foreground">
+        Pay by bank transfer after placing your order. Use your order number as the transfer reference.
+      </p>
+
+      <Button
+        className="w-full h-12"
+        size="lg"
+        onClick={onPlaceOrder}
+        disabled={isLoading || placeOrderDisabled}
+      >
+        {isLoading ? "Processing..." : placeOrderLabel}
       </Button>
     </div>
   );

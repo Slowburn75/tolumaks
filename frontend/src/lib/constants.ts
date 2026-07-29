@@ -95,17 +95,38 @@ export const orderStatuses = [
   "REFUNDED",
 ];
 
+/** Keep shipping rules in sync with backend/src/modules/orders/shipping.ts */
+export const FREE_SHIPPING_THRESHOLD = 50_000;
+
 export const deliveryMethods = [
   { id: "standard", name: "Standard Delivery", price: 1500, days: "5-7 business days" },
   { id: "express", name: "Express Delivery", price: 3500, days: "1-2 business days" },
   { id: "pickup", name: "Store Pickup", price: 0, days: "Same day" },
 ];
 
+/** Compute shipping fee the same way the API does */
+export function calculateShippingFee(deliveryMethodId: string, subtotal: number): number {
+  if (deliveryMethodId === "pickup") return 0;
+  if (subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
+  const method = deliveryMethods.find((d) => d.id === deliveryMethodId);
+  return method?.price ?? deliveryMethods[0].price;
+}
+
+/** Bank transfer is currently the only supported payment method */
 export const paymentMethods = [
-  { id: "paystack", name: "Pay with Paystack", description: "Card, Bank Transfer, USSD" },
-  { id: "flutterwave", name: "Pay with Flutterwave", description: "Card, Mobile Money, Bank" },
-  { id: "bank_transfer", name: "Bank Transfer", description: "Direct bank deposit" },
+  {
+    id: "bank_transfer",
+    name: "Bank Transfer",
+    description: "Pay via direct bank transfer. Use your order number as the payment reference.",
+  },
 ];
+
+export const bankTransferDetails = {
+  bankName: "GTBank",
+  accountName: "Tolumak Fashion Store",
+  accountNumber: "0123456789",
+  note: "Transfer the exact order total and use your order number as the transfer reference. Orders are processed after payment is confirmed.",
+};
 
 export const sortOptions = [
   { label: "Latest", value: "latest" },
